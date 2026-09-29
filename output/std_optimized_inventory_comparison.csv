@@ -1,0 +1,16 @@
+unique_id,avg_weekly_demand,current_model,current_ss,std_optimized_model,improved_ss,ss_savings_units
+14_Dept38,82787.0,Holt-Winters (ETS),25112.0,Naive (lag-1),14397.0,10716.0
+13_Dept38,89362.0,Holt-Winters (ETS),19770.0,Naive (lag-1),10044.0,9727.0
+2_Dept38,68733.0,Holt-Winters (ETS),18293.0,Naive (lag-1),10522.0,7771.0
+20_Dept92,174678.0,Holt-Winters (ETS),25645.0,LightGBM (global),20973.0,4672.0
+2_Dept92,174404.0,Holt-Winters (ETS),15491.0,Seasonal Naive (lag-52),11782.0,3710.0
+20_Dept38,114450.0,Holt-Winters (ETS),20380.0,Naive (lag-1),17011.0,3368.0
+13_Dept92,177563.0,Holt-Winters (ETS),18545.0,Naive (lag-1),15587.0,2958.0
+14_Dept95,115120.0,Holt-Winters (ETS),21198.0,Naive (lag-1),18661.0,2536.0
+4_Dept92,173256.0,Holt-Winters (ETS),12640.0,Seasonal Naive (lag-52),10678.0,1962.0
+20_Dept95,152934.0,Holt-Winters (ETS),12008.0,Seasonal Naive (lag-52),10544.0,1464.0
+2_Dept95,148379.0,Holt-Winters (ETS),11065.0,LightGBM (global),10048.0,1017.0
+14_Dept92,155363.0,Holt-Winters (ETS),27138.0,Holt-Winters (ETS),27138.0,0.0
+13_Dept95,144430.0,Holt-Winters (ETS),10938.0,Holt-Winters (ETS),10938.0,0.0
+4_Dept38,75006.0,Holt-Winters (ETS),9283.0,Holt-Winters (ETS),9283.0,0.0
+4_Dept95,159320.0,Holt-Winters (ETS),9564.0,Holt-Winters (ETS),9564.0,0.0

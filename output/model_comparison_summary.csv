@@ -1,0 +1,5 @@
+model,wmae,mae,bias
+Holt-Winters (ETS),6626.0,6765.0,10.7
+LightGBM (global),7616.7,8239.1,4780.2
+Naive (lag-1),9082.9,9161.9,3571.4
+Seasonal Naive (lag-52),13175.8,12770.3,1984.3

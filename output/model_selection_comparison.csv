@@ -1,0 +1,16 @@
+unique_id,std_best_model,std,mae_best_model,mae,agree
+13_Dept38,Naive (lag-1),4317.650130428342,Naive (lag-1),5165.491666666669,True
+13_Dept92,Naive (lag-1),6700.914129357593,Holt-Winters (ETS),6024.747356452094,False
+13_Dept95,Holt-Winters (ETS),4702.091014700058,Holt-Winters (ETS),3693.9564171203288,True
+14_Dept38,Naive (lag-1),6188.978972695958,Naive (lag-1),6394.9866666666685,True
+14_Dept92,Holt-Winters (ETS),11666.402050279516,Holt-Winters (ETS),10687.766444102543,True
+14_Dept95,Naive (lag-1),8022.228364129552,Naive (lag-1),8376.340833333335,True
+20_Dept38,Naive (lag-1),7313.019295611206,LightGBM (global),8971.652739773594,False
+20_Dept92,LightGBM (global),9016.08926101496,LightGBM (global),7047.752022767138,True
+20_Dept95,Seasonal Naive (lag-52),4532.834425601183,Holt-Winters (ETS),4875.577262350101,False
+2_Dept38,Naive (lag-1),4523.184198723149,Naive (lag-1),4552.863333333336,True
+2_Dept92,Seasonal Naive (lag-52),5064.832266067351,LightGBM (global),4098.883305230811,False
+2_Dept95,LightGBM (global),4319.355987750193,Holt-Winters (ETS),3387.6502498551513,False
+4_Dept38,Holt-Winters (ETS),3990.591510190811,Naive (lag-1),5492.7416666666695,False
+4_Dept92,Seasonal Naive (lag-52),4590.300414879687,Holt-Winters (ETS),4064.355673419321,False
+4_Dept95,Holt-Winters (ETS),4111.367822706183,Seasonal Naive (lag-52),4091.088333333338,False

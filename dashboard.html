@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Demand Planning &amp; Inventory Optimization</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #F4F6F5;
+    --panel: #FFFFFF;
+    --ink: #16241F;
+    --ink-soft: #52655D;
+    --line: #DCE3DF;
+    --teal: #1A6E68;
+    --teal-soft: #E4F1EF;
+    --amber: #C87A2A;
+    --amber-soft: #FBEEE0;
+    --red: #B4432E;
+    --red-soft: #FBE9E5;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101714; --panel: #17211C; --ink: #EAF1EC; --ink-soft: #9FB3A9;
+      --line: #263029; --teal: #4FBFB2; --teal-soft: #16302C; --amber: #E6A65C;
+      --amber-soft: #3A2A16; --red: #E28271; --red-soft: #3A1E19;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101714; --panel: #17211C; --ink: #EAF1EC; --ink-soft: #9FB3A9;
+    --line: #263029; --teal: #4FBFB2; --teal-soft: #16302C; --amber: #E6A65C;
+    --amber-soft: #3A2A16; --red: #E28271; --red-soft: #3A1E19;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    line-height: 1.5;
+    padding: clamp(16px, 4vw, 40px);
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  header { margin-bottom: 28px; }
+  .eyebrow { color: var(--teal); font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+  h1 { font-size: clamp(24px, 3.4vw, 34px); margin: 0 0 8px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-soft); font-size: 15px; max-width: 62ch; margin: 0; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 24px 0; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .kpi .label { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  .kpi .value { font-family: var(--mono); font-size: 26px; font-weight: 600; }
+  .kpi .delta { font-size: 12.5px; margin-top: 4px; }
+  .delta.good { color: var(--teal); }
+  .delta.warn { color: var(--amber); }
+
+  section { margin: 30px 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+  h2 { font-size: 16px; margin: 0 0 4px; }
+  p.note { color: var(--ink-soft); font-size: 13px; margin: 0 0 16px; max-width: 70ch; }
+
+  .grid-2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  select {
+    font-family: var(--sans); font-size: 13.5px; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 7px; background: var(--bg);
+    color: var(--ink); margin-bottom: 12px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left; font-weight: 600; color: var(--ink-soft);
+    border-bottom: 1px solid var(--line); padding: 8px 10px; font-size: 12px;
+    position: sticky; top: 0; background: var(--panel);
+  }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); font-family: var(--mono); }
+  tbody td.text { font-family: var(--sans); }
+  .table-wrap { max-height: 420px; overflow: auto; border-radius: 8px; }
+  .table-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+
+  .flag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; font-family: var(--sans); }
+  .flag.Low { background: var(--teal-soft); color: var(--teal); }
+  .flag.Moderate { background: var(--teal-soft); color: var(--ink-soft); }
+  .flag.Elevated { background: var(--amber-soft); color: var(--amber); }
+  .flag.High { background: var(--red-soft); color: var(--red); }
+
+  .methodology { font-size: 13.5px; color: var(--ink-soft); }
+  .methodology code { font-family: var(--mono); background: var(--bg); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+  .methodology dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0 0; }
+  .methodology dt { color: var(--ink); font-weight: 600; }
+
+  footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12.5px; }
+  canvas { max-width: 100%; }
+
+  input[type="search"] {
+    font-family: var(--sans); font-size: 13.5px; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 7px; background: var(--bg);
+    color: var(--ink); margin-bottom: 12px; width: 100%; max-width: 280px;
+  }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--ink); }
+  th.sortable .arrow { font-size: 10px; opacity: 0.6; }
+  .legend-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0 0; font-size: 12px; color: var(--ink-soft); }
+  .legend-row .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .legend-row .swatch-line { display: inline-block; width: 18px; height: 0; border-top: 3px solid; margin-right: 6px; vertical-align: middle; }
+  .legend-row .swatch-line.dashed { border-top-style: dashed; }
+  .legend-row .item.emph { color: var(--ink); font-weight: 600; }
+  .legend-row .item.muted-item { color: var(--ink-soft); font-weight: 400; }
+  .assumption-box {
+    background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 8px;
+    padding: 10px 14px; font-size: 12.5px; color: var(--ink); margin: 0 0 14px;
+  }
+  .assumption-box b { color: var(--amber); }
+  .controls-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Demand Planning &amp; Inventory Optimization</p>
+  <h1>The most accurate forecast isn't always the one that shrinks your safety stock</h1>
+  <p class="sub">15 store-department series from the real Walmart Recruiting: Store Sales Forecasting dataset (Kaggle), 12-week holdout backtest. Four forecasting approaches compared &mdash; then the model actually used per series was reselected by forecast consistency, not accuracy, once the two turned out to disagree on more than half the network.</p>
+</header>
+
+<section class="kpis" id="kpiRow"></section>
+
+<section class="grid-2">
+  <div class="panel">
+    <h2>Forecast accuracy by method</h2>
+    <p class="note">WMAE, weighted 5&times; on holiday weeks (the official metric this Kaggle competition used). This ranking picked Holt-Winters as "best" &mdash; but see below for why accuracy alone wasn't the right selection criterion.</p>
+    <canvas id="modelChart" height="220"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Forecast vs. actual — all 4 models</h2>
+    <p class="note">12-week holdout, by store-department. All 4 models plotted against actual; the one <strong>highlighted in teal</strong> is this series' consistency-selected winner (lowest backtest std) — the other 3 are shown muted, for direct comparison rather than taken on faith.</p>
+    <select id="seriesSelect"></select>
+    <canvas id="seriesChart" height="260"></canvas>
+    <div class="legend-row" id="seriesLegend"></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Inventory plan</h2>
+  <p class="note">Model reselected per series by lowest backtest forecast-error <em>std</em> &mdash; the property safety stock actually depends on &mdash; not by the network-wide accuracy ranking above. That single change cut a further 19.4% off the plan that was already using the "most accurate" model everywhere. Risk flag ranks forecast-error coefficient of variation into quartiles, recomputed on the corrected plan.</p>
+  <div class="table-wrap">
+    <table id="invTable">
+      <thead>
+        <tr>
+          <th>Store · Dept</th>
+          <th>Model Used</th>
+          <th>Avg Weekly Demand</th>
+          <th>Forecast Error (σ)</th>
+          <th>Safety Stock</th>
+          <th>Weeks of Cover</th>
+          <th>Reorder Point</th>
+          <th>SS Change vs. Single-Model Plan</th>
+          <th>Risk</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="panel">
+    <h2>Network safety stock — three approaches compared</h2>
+    <p class="note">Same Z and lead-time assumptions throughout; only the model backing each series' forecast-error std changes.</p>
+    <canvas id="scenarioChart" height="220"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Accuracy vs. consistency, by series &amp; model</h2>
+    <p class="note">Each point is one series-model backtest. X = WMAE (lower is more accurate). Y = forecast-error std (lower is more consistent — what drives safety stock). If accuracy and consistency were the same thing, every model's points would fall on one line — they don't.</p>
+    <canvas id="scatterChart" height="220"></canvas>
+    <div class="legend-row" id="scatterLegend"></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Full backtest comparison — all 4 models &times; all 15 series</h2>
+  <p class="note">Every model's WMAE, MAE, std, and bias for every series, not just the one selected — so the model-selection logic in the table above can be checked directly rather than taken on faith.</p>
+  <div class="controls-row">
+    <input type="search" id="compareSearch" placeholder="Filter by store · dept (e.g. 13_Dept38)">
+  </div>
+  <div class="table-wrap">
+    <table id="compareTable">
+      <thead>
+        <tr>
+          <th class="sortable" data-key="unique_id">Store · Dept <span class="arrow">↕</span></th>
+          <th class="sortable" data-key="model">Model <span class="arrow">↕</span></th>
+          <th class="sortable" data-key="wmae">WMAE <span class="arrow">↕</span></th>
+          <th class="sortable" data-key="mae">MAE <span class="arrow">↕</span></th>
+          <th class="sortable" data-key="std">Std (σₑ) <span class="arrow">↕</span></th>
+          <th class="sortable" data-key="bias">Bias <span class="arrow">↕</span></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>12-month forecast, by series</h2>
+  <p class="note">52 weeks past the end of the dataset (2012-10-26 → 2013-10-25), using each series' own selection-corrected model. Shaded band is forecast ± z·σₑ — the same forecast-error std that sizes this series' safety stock, so the band shown here is literally what that safety stock is meant to absorb.</p>
+  <div class="assumption-box">
+    <b>Assumption, stated plainly:</b> this is real forecasting into the unknown, not a backtest — actuals for these dates don't exist yet. LightGBM needs future values of holiday timing, markdown activity, temperature, fuel price, CPI, and unemployment that haven't happened. Every one of those is carried forward from the <b>same calendar week one year earlier</b> (the same logic Seasonal Naive already uses for demand itself). A real deployment would use an actual promotional calendar and macro forecast instead of this proxy.
+  </div>
+  <select id="futureSeriesSelect"></select>
+  <canvas id="futureChart" height="240"></canvas>
+</section>
+
+<section class="panel methodology">
+  <h2>Methodology</h2>
+  <p class="note">Full write-up (data, model selection rationale, formulas, limitations) is in the accompanying documentation. Summary:</p>
+  <dl>
+    <dt>Models compared</dt><dd>Naive (lag-1) · Seasonal naive (lag-52) · Holt-Winters exponential smoothing (local, per series) · LightGBM (global, pooled across all 15 series with real exogenous covariates)</dd>
+    <dt>Evaluation</dt><dd>12-week holdout per series, WMAE weighted 5&times; on holiday weeks &mdash; the same metric the real Kaggle competition used</dd>
+    <dt>Selection fix</dt><dd>Picking a single "best" model by WMAE (Holt-Winters) and applying it to every series agrees with picking the lowest-<em>std</em> model per series on only 7 of 15 series (47%). Accuracy and consistency are different properties &mdash; a model can win on one and lose on the other &mdash; and since safety stock depends on std, not WMAE, the plan now selects each series' model by std directly rather than defaulting to the network-wide accuracy winner.</dd>
+    <dt>Safety stock</dt><dd><code>SS = z · σₑ · √L</code>, where σₑ is that series' selected-model backtest forecast-error std</dd>
+    <dt>Reorder point</dt><dd><code>ROP = (avg weekly demand × L) + SS</code></dd>
+    <dt>Assumptions</dt><dd>95% target service level (z = 1.645) · 2-week replenishment lead time (not in the dataset; stated assumption)</dd>
+    <dt>Data</dt><dd>Real: Walmart Recruiting &ndash; Store Sales Forecasting (Kaggle, 2014). 421,570 weekly Store&times;Dept records, Feb 2010&ndash;Oct 2012, with real temperature, fuel price, CPI, unemployment, and promotional markdown data. Scoped to the 5 highest-volume stores &times; 3 highest-volume, fully-populated departments (15 series, no missing weeks).</dd>
+    <dt>12-month forecast</dt><dd>Each series' selected model refit on its <em>full</em> history (no holdout) and projected 52 weeks past the dataset's end. Naive and Seasonal Naive need no new assumptions (the latter's "last year" lookback is real observed data even 52 weeks out). Holt-Winters extrapolates its own trend/seasonal decomposition. LightGBM alone needs future covariates that don't exist yet &mdash; carried forward from the same calendar week one year prior, stated as an explicit assumption rather than hidden.</dd>
+  </dl>
+</section>
+
+<footer>Interactive summary artifact — see accompanying README for full research design, code, and data notes.</footer>
+
+<script id="payload" type="application/json">{"model_summary": [{"model": "Holt-Winters (ETS)", "wmae": 6626.0, "mae": 6765.0, "bias": 10.7}, {"model": "LightGBM (global)", "wmae": 7616.7, "mae": 8239.1, "bias": 4780.2}, {"model": "Naive (lag-1)", "wmae": 9082.9, "mae": 9161.9, "bias": 3571.4}, {"model": "Seasonal Naive (lag-52)", "wmae": 13175.8, "mae": 12770.3, "bias": 1984.3}], "agreement_rate": 0.4666666666666667, "inventory_plan": [{"unique_id": "13_Dept38", "model_used": "Naive (lag-1)", "avg_weekly_demand": 89362.0, "forecast_error_std": 4318.0, "safety_stock_units": 10044.0, "reorder_point_units": 188767.0, "safety_stock_weeks_of_cover": 0.11, "error_cv": 0.05, "risk_flag": "Moderate", "ss_single_model": 19770.0, "ss_change_vs_single_model_pct": 49.2}, {"unique_id": "13_Dept92", "model_used": "Naive (lag-1)", "avg_weekly_demand": 177563.0, "forecast_error_std": 6701.0, "safety_stock_units": 15587.0, "reorder_point_units": 370714.0, "safety_stock_weeks_of_cover": 0.09, "error_cv": 0.04, "risk_flag": "Moderate", "ss_single_model": 18545.0, "ss_change_vs_single_model_pct": 15.95}, {"unique_id": "13_Dept95", "model_used": "Holt-Winters (ETS)", "avg_weekly_demand": 144430.0, "forecast_error_std": 4702.0, "safety_stock_units": 10938.0, "reorder_point_units": 299797.0, "safety_stock_weeks_of_cover": 0.08, "error_cv": 0.03, "risk_flag": "Moderate", "ss_single_model": 10938.0, "ss_change_vs_single_model_pct": 0.0}, {"unique_id": "14_Dept38", "model_used": "Naive (lag-1)", "avg_weekly_demand": 82787.0, "forecast_error_std": 6189.0, "safety_stock_units": 14397.0, "reorder_point_units": 179971.0, "safety_stock_weeks_of_cover": 0.17, "error_cv": 0.07, "risk_flag": "High", "ss_single_model": 25112.0, "ss_change_vs_single_model_pct": 42.67}, {"unique_id": "14_Dept92", "model_used": "Holt-Winters (ETS)", "avg_weekly_demand": 155363.0, "forecast_error_std": 11666.0, "safety_stock_units": 27138.0, "reorder_point_units": 337865.0, "safety_stock_weeks_of_cover": 0.17, "error_cv": 0.08, "risk_flag": "High", "ss_single_model": 27138.0, "ss_change_vs_single_model_pct": 0.0}, {"unique_id": "14_Dept95", "model_used": "Naive (lag-1)", "avg_weekly_demand": 115120.0, "forecast_error_std": 8022.0, "safety_stock_units": 18661.0, "reorder_point_units": 248901.0, "safety_stock_weeks_of_cover": 0.16, "error_cv": 0.07, "risk_flag": "High", "ss_single_model": 21198.0, "ss_change_vs_single_model_pct": 11.97}, {"unique_id": "20_Dept38", "model_used": "Naive (lag-1)", "avg_weekly_demand": 114450.0, "forecast_error_std": 7313.0, "safety_stock_units": 17011.0, "reorder_point_units": 245912.0, "safety_stock_weeks_of_cover": 0.15, "error_cv": 0.06, "risk_flag": "Elevated", "ss_single_model": 20380.0, "ss_change_vs_single_model_pct": 16.53}, {"unique_id": "20_Dept92", "model_used": "LightGBM (global)", "avg_weekly_demand": 174678.0, "forecast_error_std": 9016.0, "safety_stock_units": 20973.0, "reorder_point_units": 370328.0, "safety_stock_weeks_of_cover": 0.12, "error_cv": 0.05, "risk_flag": "Elevated", "ss_single_model": 25645.0, "ss_change_vs_single_model_pct": 18.22}, {"unique_id": "20_Dept95", "model_used": "Seasonal Naive (lag-52)", "avg_weekly_demand": 152934.0, "forecast_error_std": 4533.0, "safety_stock_units": 10544.0, "reorder_point_units": 316412.0, "safety_stock_weeks_of_cover": 0.07, "error_cv": 0.03, "risk_flag": "Moderate", "ss_single_model": 12008.0, "ss_change_vs_single_model_pct": 12.19}, {"unique_id": "2_Dept38", "model_used": "Naive (lag-1)", "avg_weekly_demand": 68733.0, "forecast_error_std": 4523.0, "safety_stock_units": 10522.0, "reorder_point_units": 147988.0, "safety_stock_weeks_of_cover": 0.15, "error_cv": 0.07, "risk_flag": "High", "ss_single_model": 18293.0, "ss_change_vs_single_model_pct": 42.48}, {"unique_id": "2_Dept92", "model_used": "Seasonal Naive (lag-52)", "avg_weekly_demand": 174404.0, "forecast_error_std": 5065.0, "safety_stock_units": 11782.0, "reorder_point_units": 360590.0, "safety_stock_weeks_of_cover": 0.07, "error_cv": 0.03, "risk_flag": "Low", "ss_single_model": 15491.0, "ss_change_vs_single_model_pct": 23.94}, {"unique_id": "2_Dept95", "model_used": "LightGBM (global)", "avg_weekly_demand": 148379.0, "forecast_error_std": 4319.0, "safety_stock_units": 10048.0, "reorder_point_units": 306806.0, "safety_stock_weeks_of_cover": 0.07, "error_cv": 0.03, "risk_flag": "Low", "ss_single_model": 11065.0, "ss_change_vs_single_model_pct": 9.19}, {"unique_id": "4_Dept38", "model_used": "Holt-Winters (ETS)", "avg_weekly_demand": 75006.0, "forecast_error_std": 3991.0, "safety_stock_units": 9283.0, "reorder_point_units": 159295.0, "safety_stock_weeks_of_cover": 0.12, "error_cv": 0.05, "risk_flag": "Elevated", "ss_single_model": 9283.0, "ss_change_vs_single_model_pct": 0.0}, {"unique_id": "4_Dept92", "model_used": "Seasonal Naive (lag-52)", "avg_weekly_demand": 173256.0, "forecast_error_std": 4590.0, "safety_stock_units": 10678.0, "reorder_point_units": 357191.0, "safety_stock_weeks_of_cover": 0.06, "error_cv": 0.03, "risk_flag": "Low", "ss_single_model": 12640.0, "ss_change_vs_single_model_pct": 15.52}, {"unique_id": "4_Dept95", "model_used": "Holt-Winters (ETS)", "avg_weekly_demand": 159320.0, "forecast_error_std": 4111.0, "safety_stock_units": 9564.0, "reorder_point_units": 328203.0, "safety_stock_weeks_of_cover": 0.06, "error_cv": 0.03, "risk_flag": "Low", "ss_single_model": 9564.0, "ss_change_vs_single_model_pct": 0.0}], "series_data": {"13_Dept38": {"model_used": "Naive (lag-1)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [96027.0, 84418.0, 94545.0, 82082.0, 84992.0, 89044.0, 93644.0, 87331.0, 91582.0, 88258.0, 88326.0, 92093.0], "forecast_selected": [94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0], "forecast_naive": [94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0, 94148.0]}, "13_Dept92": {"model_used": "Naive (lag-1)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [171785.0, 182032.0, 168513.0, 167187.0, 182297.0, 176190.0, 179575.0, 169014.0, 181472.0, 184760.0, 184451.0, 183484.0], "forecast_selected": [171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0], "forecast_naive": [171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0, 171598.0]}, "13_Dept95": {"model_used": "Holt-Winters (ETS)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [157893.0, 159905.0, 148855.0, 152272.0, 153517.0, 140258.0, 144489.0, 134397.0, 140832.0, 135555.0, 137769.0, 127416.0], "forecast_selected": [152345.0, 155764.0, 147374.0, 152826.0, 140749.0, 144345.0, 135216.0, 135757.0, 141026.0, 134782.0, 135007.0, 126033.0], "forecast_naive": [155704.0, 155704.0, 155704.0, 155704.0, 155704.0, 155704.0, 155704.0, 155704.0, 155704.0, 155704.0, 155704.0, 155704.0]}, "14_Dept38": {"model_used": "Naive (lag-1)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [76611.0, 89901.0, 81688.0, 95512.0, 72916.0, 84534.0, 79171.0, 81150.0, 78208.0, 88188.0, 84022.0, 81546.0], "forecast_selected": [87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0], "forecast_naive": [87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0]}, "14_Dept92": {"model_used": "Holt-Winters (ETS)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [163285.0, 149473.0, 145010.0, 138589.0, 190580.0, 146630.0, 148417.0, 139708.0, 169519.0, 156174.0, 152512.0, 164464.0], "forecast_selected": [147299.0, 144267.0, 158741.0, 150924.0, 172709.0, 143911.0, 137172.0, 137906.0, 177758.0, 147564.0, 144550.0, 141917.0], "forecast_naive": [156775.0, 156775.0, 156775.0, 156775.0, 156775.0, 156775.0, 156775.0, 156775.0, 156775.0, 156775.0, 156775.0, 156775.0]}, "14_Dept95": {"model_used": "Naive (lag-1)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [126159.0, 117214.0, 113004.0, 107729.0, 131721.0, 110841.0, 110174.0, 105376.0, 118492.0, 109851.0, 109527.0, 121353.0], "forecast_selected": [120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0], "forecast_naive": [120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0, 120582.0]}, "20_Dept38": {"model_used": "Naive (lag-1)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [109597.0, 111501.0, 110673.0, 109884.0, 128805.0, 121818.0, 107513.0, 114014.0, 124166.0, 119800.0, 107034.0, 108597.0], "forecast_selected": [132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0], "forecast_naive": [132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0, 132253.0]}, "20_Dept92": {"model_used": "LightGBM (global)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [194032.0, 178604.0, 159088.0, 159050.0, 178043.0, 186759.0, 171529.0, 158539.0, 187027.0, 191136.0, 171538.0, 160786.0], "forecast_selected": [184339.0, 171348.0, 159855.0, 175226.0, 177112.0, 184603.0, 168982.0, 171092.0, 185594.0, 198389.0, 176774.0, 179358.0], "forecast_naive": [169471.0, 169471.0, 169471.0, 169471.0, 169471.0, 169471.0, 169471.0, 169471.0, 169471.0, 169471.0, 169471.0, 169471.0]}, "20_Dept95": {"model_used": "Seasonal Naive (lag-52)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [174530.0, 158189.0, 151040.0, 153289.0, 158420.0, 158569.0, 147853.0, 136010.0, 154324.0, 154963.0, 146374.0, 141644.0], "forecast_selected": [162233.0, 150601.0, 141665.0, 154019.0, 157061.0, 153383.0, 137081.0, 137191.0, 148157.0, 154193.0, 142459.0, 133484.0], "forecast_naive": [157302.0, 157302.0, 157302.0, 157302.0, 157302.0, 157302.0, 157302.0, 157302.0, 157302.0, 157302.0, 157302.0, 157302.0]}, "2_Dept38": {"model_used": "Naive (lag-1)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [63261.0, 64289.0, 70536.0, 73745.0, 72382.0, 68752.0, 68481.0, 60410.0, 76287.0, 66963.0, 68932.0, 70758.0], "forecast_selected": [72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0], "forecast_naive": [72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0]}, "2_Dept92": {"model_used": "Seasonal Naive (lag-52)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [170284.0, 173002.0, 157875.0, 169994.0, 182189.0, 179420.0, 169646.0, 159370.0, 192861.0, 192456.0, 175972.0, 169784.0], "forecast_selected": [158082.0, 153827.0, 147187.0, 156168.0, 164688.0, 163843.0, 150257.0, 148682.0, 176376.0, 164034.0, 163290.0, 158041.0], "forecast_naive": [170120.0, 170120.0, 170120.0, 170120.0, 170120.0, 170120.0, 170120.0, 170120.0, 170120.0, 170120.0, 170120.0, 170120.0]}, "2_Dept95": {"model_used": "LightGBM (global)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [157228.0, 151759.0, 137902.0, 154732.0, 155702.0, 151209.0, 145470.0, 144371.0, 152482.0, 145394.0, 146283.0, 138019.0], "forecast_selected": [157562.0, 152072.0, 152289.0, 155222.0, 154535.0, 151874.0, 151479.0, 150356.0, 157757.0, 151885.0, 149852.0, 144075.0], "forecast_naive": [159757.0, 159757.0, 159757.0, 159757.0, 159757.0, 159757.0, 159757.0, 159757.0, 159757.0, 159757.0, 159757.0, 159757.0]}, "4_Dept38": {"model_used": "Holt-Winters (ETS)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [80656.0, 72190.0, 68652.0, 77294.0, 70558.0, 80099.0, 73899.0, 71725.0, 86611.0, 72208.0, 67826.0, 78355.0], "forecast_selected": [78777.0, 82738.0, 80309.0, 85557.0, 75077.0, 86754.0, 78930.0, 79654.0, 94107.0, 76479.0, 81034.0, 83535.0], "forecast_naive": [78542.0, 78542.0, 78542.0, 78542.0, 78542.0, 78542.0, 78542.0, 78542.0, 78542.0, 78542.0, 78542.0, 78542.0]}, "4_Dept92": {"model_used": "Seasonal Naive (lag-52)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [172350.0, 173826.0, 168317.0, 158090.0, 177979.0, 180938.0, 176025.0, 163451.0, 186275.0, 179527.0, 177407.0, 164892.0], "forecast_selected": [159671.0, 171554.0, 152595.0, 152433.0, 168014.0, 168868.0, 163452.0, 146263.0, 178151.0, 166415.0, 171337.0, 159591.0], "forecast_naive": [166268.0, 166268.0, 166268.0, 166268.0, 166268.0, 166268.0, 166268.0, 166268.0, 166268.0, 166268.0, 166268.0, 166268.0]}, "4_Dept95": {"model_used": "Holt-Winters (ETS)", "dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [166721.0, 175362.0, 164985.0, 160200.0, 169708.0, 158168.0, 155205.0, 150887.0, 157751.0, 152136.0, 154909.0, 145803.0], "forecast_selected": [174753.0, 172951.0, 161444.0, 165085.0, 166774.0, 165960.0, 159006.0, 154842.0, 162703.0, 158928.0, 160415.0, 150675.0], "forecast_naive": [167251.0, 167251.0, 167251.0, 167251.0, 167251.0, 167251.0, 167251.0, 167251.0, 167251.0, 167251.0, 167251.0, 167251.0]}}, "kpis": {"best_wmae": 6626.0, "naive_wmae": 9082.9, "total_ss_naive": 290267.0, "total_ss_single_model": 257070.0, "total_ss_corrected": 207170.0, "reduction_single_vs_naive_pct": 11.436711717143181, "reduction_corrected_vs_single_pct": 19.411055354572685, "reduction_corrected_vs_naive_pct": 28.627780629558302, "n_series": 15, "agreement_count": 7}, "model_comparison_full": [{"unique_id": "13_Dept38", "model": "Naive (lag-1)", "wmae": 6163.3, "mae": 5165.5, "std": 4317.7, "bias": -4786.2}, {"unique_id": "13_Dept38", "model": "Seasonal Naive (lag-52)", "wmae": 7134.1, "mae": 7705.8, "std": 9527.0, "bias": 3867.5}, {"unique_id": "13_Dept38", "model": "Holt-Winters (ETS)", "wmae": 6029.6, "mae": 6435.8, "std": 8499.1, "bias": 1023.7}, {"unique_id": "13_Dept38", "model": "LightGBM (global)", "wmae": 5524.0, "mae": 5857.4, "std": 6399.9, "bias": 5295.3}, {"unique_id": "13_Dept92", "model": "Naive (lag-1)", "wmae": 8408.6, "mae": 7645.3, "std": 6700.9, "bias": 5965.2}, {"unique_id": "13_Dept92", "model": "Seasonal Naive (lag-52)", "wmae": 14694.9, "mae": 11929.6, "std": 10191.3, "bias": 9207.0}, {"unique_id": "13_Dept92", "model": "Holt-Winters (ETS)", "wmae": 7058.5, "mae": 6024.7, "std": 7972.3, "bias": 182.0}, {"unique_id": "13_Dept92", "model": "LightGBM (global)", "wmae": 6642.4, "mae": 8521.5, "std": 8848.3, "bias": -7167.8}, {"unique_id": "13_Dept95", "model": "Naive (lag-1)", "wmae": 9801.4, "mae": 12339.4, "std": 10126.5, "bias": -11274.7}, {"unique_id": "13_Dept95", "model": "Seasonal Naive (lag-52)", "wmae": 7075.0, "mae": 5151.9, "std": 6438.0, "bias": 2652.8}, {"unique_id": "13_Dept95", "model": "Holt-Winters (ETS)", "wmae": 5962.7, "mae": 3694.0, "std": 4702.1, "bias": 2661.3}, {"unique_id": "13_Dept95", "model": "LightGBM (global)", "wmae": 10470.5, "mae": 12481.3, "std": 7093.3, "bias": -12435.7}, {"unique_id": "14_Dept38", "model": "Naive (lag-1)", "wmae": 8358.1, "mae": 6395.0, "std": 6189.0, "bias": -4376.8}, {"unique_id": "14_Dept38", "model": "Seasonal Naive (lag-52)", "wmae": 20804.0, "mae": 19139.9, "std": 10885.6, "bias": -19139.9}, {"unique_id": "14_Dept38", "model": "Holt-Winters (ETS)", "wmae": 5595.8, "mae": 7029.6, "std": 10795.6, "bias": 2068.9}, {"unique_id": "14_Dept38", "model": "LightGBM (global)", "wmae": 6754.4, "mae": 7033.1, "std": 7729.2, "bias": -2980.4}, {"unique_id": "14_Dept92", "model": "Naive (lag-1)", "wmae": 17103.4, "mae": 11536.2, "std": 14733.5, "bias": -1411.4}, {"unique_id": "14_Dept92", "model": "Seasonal Naive (lag-52)", "wmae": 30236.1, "mae": 32358.4, "std": 22873.7, "bias": -32358.4}, {"unique_id": "14_Dept92", "model": "Holt-Winters (ETS)", "wmae": 12483.6, "mae": 10687.8, "std": 11666.4, "bias": 4970.2}, {"unique_id": "14_Dept92", "model": "LightGBM (global)", "wmae": 22396.6, "mae": 21742.4, "std": 19807.0, "bias": -14020.9}, {"unique_id": "14_Dept95", "model": "Naive (lag-1)", "wmae": 9067.1, "mae": 8376.3, "std": 8022.2, "bias": -5461.8}, {"unique_id": "14_Dept95", "model": "Seasonal Naive (lag-52)", "wmae": 30874.8, "mae": 31324.4, "std": 20294.4, "bias": -31324.4}, {"unique_id": "14_Dept95", "model": "Holt-Winters (ETS)", "wmae": 12331.4, "mae": 12646.9, "std": 9112.6, "bias": 11519.7}, {"unique_id": "14_Dept95", "model": "LightGBM (global)", "wmae": 10471.3, "mae": 9110.2, "std": 10049.4, "bias": -4288.0}, {"unique_id": "20_Dept38", "model": "Naive (lag-1)", "wmae": 14214.1, "mae": 17802.7, "std": 7313.0, "bias": -17802.7}, {"unique_id": "20_Dept38", "model": "Seasonal Naive (lag-52)", "wmae": 15649.8, "mae": 10746.1, "std": 12384.1, "bias": 7761.0}, {"unique_id": "20_Dept38", "model": "Holt-Winters (ETS)", "wmae": 8771.1, "mae": 10975.2, "std": 8761.0, "bias": -9200.6}, {"unique_id": "20_Dept38", "model": "LightGBM (global)", "wmae": 11041.3, "mae": 8971.7, "std": 10341.1, "bias": -3231.3}, {"unique_id": "20_Dept92", "model": "Naive (lag-1)", "wmae": 11100.3, "mae": 11943.3, "std": 13249.9, "bias": 5206.1}, {"unique_id": "20_Dept92", "model": "Seasonal Naive (lag-52)", "wmae": 7346.7, "mae": 9713.9, "std": 9236.3, "bias": 8815.3}, {"unique_id": "20_Dept92", "model": "Holt-Winters (ETS)", "wmae": 9274.5, "mae": 8356.3, "std": 11024.6, "bias": -3523.1}, {"unique_id": "20_Dept92", "model": "LightGBM (global)", "wmae": 5518.4, "mae": 7047.8, "std": 9016.1, "bias": -3045.2}, {"unique_id": "20_Dept95", "model": "Naive (lag-1)", "wmae": 6118.2, "mae": 7784.8, "std": 9762.4, "bias": -4368.0}, {"unique_id": "20_Dept95", "model": "Seasonal Naive (lag-52)", "wmae": 4558.6, "mae": 5625.1, "std": 4532.8, "bias": 5306.7}, {"unique_id": "20_Dept95", "model": "Holt-Winters (ETS)", "wmae": 4466.1, "mae": 4875.6, "std": 5162.2, "bias": 2371.0}, {"unique_id": "20_Dept95", "model": "LightGBM (global)", "wmae": 4109.1, "mae": 4931.7, "std": 7404.8, "bias": -213.5}, {"unique_id": "2_Dept38", "model": "Naive (lag-1)", "wmae": 3424.3, "mae": 4552.9, "std": 4523.2, "bias": -3687.8}, {"unique_id": "2_Dept38", "model": "Seasonal Naive (lag-52)", "wmae": 9408.0, "mae": 11849.2, "std": 7729.2, "bias": -11501.8}, {"unique_id": "2_Dept38", "model": "Holt-Winters (ETS)", "wmae": 4490.6, "mae": 5423.4, "std": 7863.9, "bias": -3197.1}, {"unique_id": "2_Dept38", "model": "LightGBM (global)", "wmae": 6410.1, "mae": 8164.0, "std": 5195.8, "bias": -7749.5}, {"unique_id": "2_Dept92", "model": "Naive (lag-1)", "wmae": 9221.8, "mae": 8272.8, "std": 11022.2, "bias": 4284.0}, {"unique_id": "2_Dept92", "model": "Seasonal Naive (lag-52)", "wmae": 16149.1, "mae": 15698.2, "std": 5064.8, "bias": 15698.2}, {"unique_id": "2_Dept92", "model": "Holt-Winters (ETS)", "wmae": 4873.9, "mae": 5698.0, "std": 6659.5, "bias": 1114.5}, {"unique_id": "2_Dept92", "model": "LightGBM (global)", "wmae": 3588.7, "mae": 4098.9, "std": 5466.5, "bias": -297.7}, {"unique_id": "2_Dept95", "model": "Naive (lag-1)", "wmae": 9547.5, "mae": 11378.1, "std": 6491.0, "bias": -11378.1}, {"unique_id": "2_Dept95", "model": "Seasonal Naive (lag-52)", "wmae": 8912.1, "mae": 7996.0, "std": 5516.9, "bias": 6451.8}, {"unique_id": "2_Dept95", "model": "Holt-Winters (ETS)", "wmae": 3754.6, "mae": 3387.7, "std": 4756.7, "bias": -224.3}, {"unique_id": "2_Dept95", "model": "LightGBM (global)", "wmae": 3462.8, "mae": 4228.4, "std": 4319.4, "bias": -4034.1}, {"unique_id": "4_Dept38", "model": "Naive (lag-1)", "wmae": 6115.5, "mae": 5492.7, "std": 5628.3, "bias": -3536.3}, {"unique_id": "4_Dept38", "model": "Seasonal Naive (lag-52)", "wmae": 9583.6, "mae": 8164.2, "std": 7237.6, "bias": -7324.4}, {"unique_id": "4_Dept38", "model": "Holt-Winters (ETS)", "wmae": 6544.4, "mae": 7219.7, "std": 3990.6, "bias": -6906.6}, {"unique_id": "4_Dept38", "model": "LightGBM (global)", "wmae": 5404.7, "mae": 5737.9, "std": 6110.2, "bias": -2956.4}, {"unique_id": "4_Dept92", "model": "Naive (lag-1)", "wmae": 9715.7, "mae": 9050.5, "std": 8183.6, "bias": 6988.8}, {"unique_id": "4_Dept92", "model": "Seasonal Naive (lag-52)", "wmae": 10037.0, "mae": 10061.0, "std": 4590.3, "bias": 10061.0}, {"unique_id": "4_Dept92", "model": "Holt-Winters (ETS)", "wmae": 3303.2, "mae": 4064.4, "std": 5433.6, "bias": 454.5}, {"unique_id": "4_Dept92", "model": "LightGBM (global)", "wmae": 4728.0, "mae": 5636.9, "std": 5882.3, "bias": -5636.9}, {"unique_id": "4_Dept95", "model": "Naive (lag-1)", "wmae": 7883.8, "mae": 9692.6, "std": 8520.1, "bias": -7931.0}, {"unique_id": "4_Dept95", "model": "Seasonal Naive (lag-52)", "wmae": 5173.8, "mae": 4091.1, "std": 4608.7, "bias": 2063.6}, {"unique_id": "4_Dept95", "model": "Holt-Winters (ETS)", "wmae": 4450.6, "mae": 4956.2, "std": 4111.4, "bias": -3475.2}, {"unique_id": "4_Dept95", "model": "LightGBM (global)", "wmae": 7728.6, "mae": 10023.0, "std": 7253.8, "bias": -8940.2}], "future_forecast": {"13_Dept38": {"model_used": "Naive (lag-1)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8, 92092.8], "lower": [84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4, 84990.4], "upper": [99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3, 99195.3]}, "13_Dept92": {"model_used": "Naive (lag-1)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9, 183483.9], "lower": [172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8, 172461.8], "upper": [194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1, 194506.1]}, "13_Dept95": {"model_used": "Holt-Winters (ETS)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [125374.4, 130553.6, 135142.6, 142124.3, 119796.0, 138898.5, 146924.7, 176678.6, 125376.0, 127970.8, 134578.0, 144106.8, 134842.0, 140828.3, 144058.9, 136772.7, 133350.8, 137504.3, 139940.4, 144208.6, 133400.7, 135512.1, 136506.6, 138269.7, 140206.8, 132480.5, 141955.6, 141774.7, 144471.5, 145644.2, 143131.0, 154087.4, 160821.0, 156375.3, 164748.8, 162327.6, 159905.6, 161313.1, 148796.4, 155848.0, 153647.4, 156516.0, 147770.1, 152626.0, 144293.1, 143331.5, 138089.2, 135800.9, 141743.0, 135570.0, 136573.3, 127016.6], "lower": [117640.3, 122819.5, 127408.5, 134390.2, 112061.9, 131164.4, 139190.6, 168944.5, 117641.9, 120236.7, 126843.9, 136372.7, 127107.9, 133094.2, 136324.8, 129038.6, 125616.7, 129770.2, 132206.3, 136474.5, 125666.6, 127778.0, 128772.5, 130535.6, 132472.7, 124746.4, 134221.5, 134040.6, 136737.4, 137910.1, 135396.9, 146353.3, 153086.9, 148641.2, 157014.7, 154593.5, 152171.5, 153579.0, 141062.3, 148113.9, 145913.3, 148781.9, 140036.0, 144891.9, 136559.0, 135597.4, 130355.1, 128066.8, 134008.9, 127835.9, 128839.2, 119282.5], "upper": [133108.5, 138287.7, 142876.7, 149858.4, 127530.1, 146632.6, 154658.8, 184412.7, 133110.1, 135704.9, 142312.1, 151840.9, 142576.1, 148562.4, 151793.0, 144506.8, 141084.9, 145238.4, 147674.5, 151942.7, 141134.8, 143246.2, 144240.7, 146003.8, 147940.9, 140214.7, 149689.7, 149508.8, 152205.6, 153378.3, 150865.1, 161821.5, 168555.1, 164109.4, 172482.9, 170061.7, 167639.7, 169047.2, 156530.5, 163582.1, 161381.5, 164250.1, 155504.2, 160360.1, 152027.2, 151065.6, 145823.3, 143535.0, 149477.1, 143304.1, 144307.4, 134750.7]}, "14_Dept38": {"model_used": "Naive (lag-1)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6, 81545.6], "lower": [71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6, 71365.6], "upper": [91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6, 91725.6]}, "14_Dept92": {"model_used": "Holt-Winters (ETS)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [179832.3, 173463.4, 170311.1, 193956.0, 150946.0, 194472.0, 179948.6, 218031.5, 121102.5, 172620.2, 151326.6, 147693.6, 135505.2, 182614.8, 162598.1, 148959.8, 153779.2, 173148.3, 164540.3, 151631.6, 144558.0, 148265.7, 178167.2, 147355.3, 163206.0, 116592.0, 168173.7, 136806.4, 151270.7, 142814.6, 134243.9, 161692.8, 144653.5, 136901.8, 145539.9, 158569.8, 138607.5, 123921.7, 128052.4, 169842.0, 147681.4, 145908.7, 142191.9, 163645.4, 171898.3, 146005.5, 137026.5, 140195.2, 176590.2, 147951.1, 146064.5, 141824.4], "lower": [160643.5, 154274.5, 151122.3, 174767.2, 131757.2, 175283.2, 160759.8, 198842.6, 101913.6, 153431.3, 132137.7, 128504.8, 116316.4, 163426.0, 143409.3, 129770.9, 134590.4, 153959.5, 145351.5, 132442.8, 125369.1, 129076.8, 158978.3, 128166.4, 144017.1, 97403.1, 148984.8, 117617.6, 132081.8, 123625.7, 115055.0, 142503.9, 125464.7, 117712.9, 126351.1, 139380.9, 119418.6, 104732.9, 108863.5, 150653.1, 128492.5, 126719.9, 123003.1, 144456.5, 152709.5, 126816.7, 117837.7, 121006.3, 157401.3, 128762.3, 126875.7, 122635.5], "upper": [199021.2, 192652.2, 189500.0, 213144.9, 170134.9, 213660.9, 199137.5, 237220.3, 140291.3, 191809.0, 170515.4, 166882.5, 154694.1, 201803.7, 181787.0, 168148.6, 172968.1, 192337.2, 183729.2, 170820.5, 163746.8, 167454.5, 197356.0, 166544.1, 182394.8, 135780.8, 187362.5, 155995.3, 170459.5, 162003.5, 153432.7, 180881.6, 163842.4, 156090.7, 164728.8, 177758.7, 157796.3, 143110.6, 147241.2, 189030.8, 166870.2, 165097.6, 161380.8, 182834.2, 191087.2, 165194.4, 156215.4, 159384.1, 195779.0, 167140.0, 165253.4, 161013.2]}, "14_Dept95": {"model_used": "Naive (lag-1)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6, 121352.6], "lower": [108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6, 108157.6], "upper": [134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6, 134547.6]}, "20_Dept38": {"model_used": "Naive (lag-1)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1, 108597.1], "lower": [96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3, 96568.3], "upper": [120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9, 120625.9]}, "20_Dept92": {"model_used": "LightGBM (global)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [189636.5, 200181.1, 203001.5, 216009.4, 159308.5, 203294.4, 220585.1, 241750.9, 135461.4, 189356.4, 201918.1, 196635.0, 168288.9, 185374.3, 202073.6, 191728.1, 178643.3, 186457.9, 193020.9, 180854.2, 151303.7, 170780.6, 208598.9, 170098.8, 157403.7, 176105.4, 174877.2, 190884.3, 170671.1, 172419.5, 159752.7, 193568.7, 182391.8, 166235.6, 167561.7, 181341.9, 190021.2, 172796.6, 161777.5, 168233.6, 189623.5, 177614.6, 167313.4, 161476.8, 180488.7, 183284.3, 173683.3, 162531.9, 184635.3, 191796.9, 168684.1, 169131.0], "lower": [174806.5, 185351.1, 188171.5, 201179.4, 144478.5, 188464.4, 205755.1, 226920.9, 120631.4, 174526.4, 187088.1, 181805.0, 153458.9, 170544.3, 187243.6, 176898.1, 163813.3, 171627.9, 178190.9, 166024.2, 136473.7, 155950.6, 193768.9, 155268.8, 142573.7, 161275.4, 160047.2, 176054.3, 155841.1, 157589.5, 144922.7, 178738.7, 167561.8, 151405.6, 152731.7, 166511.9, 175191.2, 157966.6, 146947.5, 153403.6, 174793.5, 162784.6, 152483.4, 146646.8, 165658.7, 168454.3, 158853.3, 147701.9, 169805.3, 176966.9, 153854.1, 154301.0], "upper": [204466.5, 215011.1, 217831.5, 230839.4, 174138.5, 218124.4, 235415.1, 256580.9, 150291.4, 204186.4, 216748.1, 211465.0, 183118.9, 200204.3, 216903.6, 206558.1, 193473.3, 201287.9, 207850.9, 195684.2, 166133.7, 185610.6, 223428.9, 184928.8, 172233.7, 190935.4, 189707.2, 205714.3, 185501.1, 187249.5, 174582.7, 208398.7, 197221.8, 181065.6, 182391.7, 196171.9, 204851.2, 187626.6, 176607.5, 183063.6, 204453.5, 192444.6, 182143.4, 176306.8, 195318.7, 198114.3, 188513.3, 177361.9, 199465.3, 206626.9, 183514.1, 183961.0]}, "20_Dept95": {"model_used": "Seasonal Naive (lag-52)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [139008.1, 147130.7, 136225.1, 130536.8, 131727.1, 149083.5, 150916.1, 163054.7, 117238.3, 141648.1, 149729.0, 143486.9, 125089.7, 143446.2, 161933.2, 144682.1, 139531.0, 142344.5, 158121.2, 151948.4, 138870.1, 139675.1, 167266.8, 147108.5, 142145.7, 142105.9, 158423.5, 165318.2, 150141.6, 156589.4, 152730.0, 165947.5, 166720.0, 159481.7, 158878.9, 185215.0, 175119.0, 154529.0, 146492.1, 157301.7, 174529.9, 158188.9, 151040.1, 153289.1, 158419.9, 158569.3, 147852.5, 136009.7, 154324.3, 154962.8, 146373.8, 141644.4], "lower": [131552.0, 139674.5, 128769.0, 123080.6, 124271.0, 141627.4, 143460.0, 155598.6, 109782.1, 134192.0, 142272.8, 136030.8, 117633.6, 135990.1, 154477.1, 137226.0, 132074.9, 134888.4, 150665.1, 144492.3, 131414.0, 132219.0, 159810.7, 139652.4, 134689.6, 134649.8, 150967.4, 157862.0, 142685.5, 149133.2, 145273.9, 158491.4, 159263.9, 152025.6, 151422.8, 177758.9, 167662.8, 147072.8, 139036.0, 149845.6, 167073.8, 150732.7, 143583.9, 145833.0, 150963.7, 151113.2, 140396.4, 128553.6, 146868.1, 147506.6, 138917.7, 134188.3], "upper": [146464.2, 154586.8, 143681.2, 137992.9, 139183.2, 156539.6, 158372.2, 170510.9, 124694.4, 149104.2, 157185.1, 150943.0, 132545.8, 150902.4, 169389.3, 152138.2, 146987.1, 149800.7, 165577.3, 159404.5, 146326.3, 147131.2, 174722.9, 154564.6, 149601.8, 149562.0, 165879.6, 172774.3, 157597.7, 164045.5, 160186.2, 173403.6, 174176.1, 166937.8, 166335.1, 192671.1, 182575.1, 161985.1, 153948.3, 164757.8, 181986.1, 165645.0, 158496.2, 160745.3, 165876.0, 166025.4, 155308.7, 143465.9, 161780.4, 162418.9, 153830.0, 149100.6]}, "2_Dept38": {"model_used": "Naive (lag-1)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7, 70757.7], "lower": [63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0, 63318.0], "upper": [78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4, 78197.4]}, "2_Dept92": {"model_used": "Seasonal Naive (lag-52)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [173785.3, 190979.7, 204812.4, 238066.2, 154526.6, 195953.7, 204935.0, 257375.4, 142937.9, 177356.4, 182046.5, 169381.7, 160380.0, 176421.9, 184489.0, 186888.8, 164492.5, 166966.6, 177087.8, 175208.8, 156718.6, 152398.9, 185060.6, 170989.2, 164123.2, 151824.4, 164192.8, 169818.8, 167197.0, 157451.1, 154734.5, 181331.7, 169931.8, 159611.9, 155974.4, 179105.5, 168346.0, 164392.5, 156687.7, 170120.4, 170283.7, 173002.1, 157874.8, 169994.1, 182189.3, 179419.9, 169646.4, 159369.5, 192860.9, 192455.7, 175972.0, 169784.1], "lower": [165454.1, 182648.5, 196481.2, 229735.0, 146195.5, 187622.5, 196603.8, 249044.2, 134606.7, 169025.2, 173715.3, 161050.5, 152048.8, 168090.7, 176157.9, 178557.6, 156161.3, 158635.4, 168756.6, 166877.6, 148387.4, 144067.7, 176729.4, 162658.0, 155792.0, 143493.2, 155861.6, 161487.6, 158865.8, 149119.9, 146403.3, 173000.5, 161600.6, 151280.7, 147643.3, 170774.3, 160014.8, 156061.3, 148356.5, 161789.2, 161952.5, 164670.9, 149543.7, 161663.0, 173858.2, 171088.8, 161315.2, 151038.3, 184529.7, 184124.6, 167640.8, 161452.9], "upper": [182116.5, 199310.9, 213143.6, 246397.4, 162857.8, 204284.9, 213266.2, 265706.6, 151269.1, 185687.5, 190377.7, 177712.9, 168711.1, 184753.1, 192820.2, 195219.9, 172823.6, 175297.8, 185419.0, 183540.0, 165049.8, 160730.1, 193391.8, 179320.4, 172454.4, 160155.6, 172524.0, 178150.0, 175528.2, 165782.3, 163065.6, 189662.9, 178262.9, 167943.1, 164305.6, 187436.7, 176677.2, 172723.7, 165018.9, 178451.6, 178614.9, 181333.3, 166206.0, 178325.3, 190520.5, 187751.1, 177977.5, 167700.7, 201192.0, 200786.9, 184303.2, 178115.3]}, "2_Dept95": {"model_used": "LightGBM (global)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [135224.7, 134677.8, 135939.8, 136063.5, 126834.4, 137838.1, 143197.7, 160570.8, 110875.0, 138452.1, 138746.1, 134676.2, 129817.6, 136520.2, 141773.6, 141809.4, 135744.6, 139022.1, 144283.3, 146159.8, 139464.9, 142499.3, 158278.9, 151574.4, 151370.2, 148198.9, 160947.5, 159847.2, 160892.1, 160716.9, 159988.7, 169135.5, 167990.0, 166852.9, 166089.6, 176042.2, 154173.1, 155854.2, 160078.1, 169420.2, 159106.9, 161532.4, 154397.6, 165407.1, 165887.2, 164340.0, 155498.7, 153758.6, 158822.3, 153610.9, 150430.9, 144731.0], "lower": [128120.6, 127573.7, 128835.7, 128959.4, 119730.3, 130734.0, 136093.6, 153466.6, 103770.9, 131348.0, 131642.0, 127572.1, 122713.4, 129416.1, 134669.5, 134705.3, 128640.5, 131918.0, 137179.1, 139055.7, 132360.8, 135395.2, 151174.7, 144470.2, 144266.0, 141094.7, 153843.4, 152743.1, 153788.0, 153612.8, 152884.6, 162031.4, 160885.9, 159748.8, 158985.5, 168938.1, 147069.0, 148750.1, 152974.0, 162316.1, 152002.8, 154428.3, 147293.5, 158303.0, 158783.1, 157235.8, 148394.6, 146654.5, 151718.2, 146506.8, 143326.7, 137626.9], "upper": [142328.8, 141781.9, 143044.0, 143167.6, 133938.5, 144942.2, 150301.8, 167674.9, 117979.1, 145556.3, 145850.3, 141780.3, 136921.7, 143624.3, 148877.7, 148913.5, 142848.8, 146126.2, 151387.4, 153264.0, 146569.1, 149603.5, 165383.0, 158678.5, 158474.3, 155303.0, 168051.7, 166951.4, 167996.2, 167821.0, 167092.8, 176239.6, 175094.2, 173957.0, 173193.8, 183146.3, 161277.2, 162958.3, 167182.2, 176524.3, 166211.0, 168636.5, 161501.7, 172511.2, 172991.3, 171444.1, 162602.8, 160862.8, 165926.4, 160715.1, 157535.0, 151835.1]}, "4_Dept38": {"model_used": "Holt-Winters (ETS)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [77575.1, 79199.4, 68950.9, 58728.3, 85725.7, 79821.3, 72461.1, 65006.6, 62089.6, 95115.5, 81906.8, 72029.2, 76968.1, 79480.1, 78747.8, 74202.4, 74650.2, 86162.5, 77582.3, 70006.7, 74309.4, 72883.6, 79052.1, 66841.3, 70571.0, 67455.8, 75155.8, 64713.0, 62455.0, 71810.1, 64904.3, 71775.1, 64403.9, 60209.6, 60575.7, 62446.2, 66461.6, 65120.2, 62506.0, 69976.5, 66032.2, 66083.5, 63383.9, 69766.7, 60484.8, 71066.4, 63808.0, 63612.0, 78015.3, 61811.5, 63244.0, 67322.2], "lower": [71010.5, 72634.8, 62386.2, 52163.7, 79161.1, 73256.6, 65896.5, 58442.0, 55525.0, 88550.9, 75342.2, 65464.6, 70403.5, 72915.5, 72183.2, 67637.8, 68085.6, 79597.9, 71017.7, 63442.1, 67744.8, 66319.0, 72487.5, 60276.7, 64006.3, 60891.2, 68591.2, 58148.4, 55890.4, 65245.5, 58339.7, 65210.5, 57839.2, 53644.9, 54011.1, 55881.6, 59897.0, 58555.5, 55941.4, 63411.9, 59467.6, 59518.9, 56819.3, 63202.1, 53920.2, 64501.8, 57243.4, 57047.4, 71450.6, 55246.8, 56679.4, 60757.6], "upper": [84139.7, 85764.0, 75515.5, 65292.9, 92290.3, 86385.9, 79025.7, 71571.3, 68654.2, 101680.1, 88471.4, 78593.8, 83532.7, 86044.7, 85312.4, 80767.1, 81214.8, 92727.2, 84146.9, 76571.3, 80874.0, 79448.2, 85616.7, 73405.9, 77135.6, 74020.4, 81720.4, 71277.6, 69019.6, 78374.7, 71468.9, 78339.7, 70968.5, 66774.2, 67140.3, 69010.8, 73026.2, 71684.8, 69070.6, 76541.1, 72596.8, 72648.1, 69948.5, 76331.3, 67049.4, 77631.0, 70372.6, 70176.6, 84579.9, 68376.1, 69808.6, 73886.8]}, "4_Dept92": {"model_used": "Seasonal Naive (lag-52)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [179147.2, 182939.8, 202030.0, 231334.6, 159582.4, 186204.4, 195603.8, 239759.3, 140979.3, 183928.5, 186643.7, 180360.5, 166185.5, 178296.2, 186879.5, 181812.7, 172569.5, 170055.9, 176296.6, 175034.4, 162949.9, 150911.5, 185382.5, 163875.5, 169275.5, 148421.2, 164361.8, 164657.6, 173004.6, 154709.8, 158895.2, 175156.2, 175591.6, 165010.6, 158698.6, 174602.6, 170507.7, 171958.3, 156710.9, 166267.5, 172350.0, 173825.9, 168317.1, 158089.6, 177978.9, 180938.1, 176024.9, 163451.4, 186275.0, 179527.0, 177406.8, 164891.8], "lower": [171597.3, 175389.9, 194480.1, 223784.7, 152032.5, 178654.5, 188053.9, 232209.4, 133429.5, 176378.6, 179093.9, 172810.6, 158635.6, 170746.3, 179329.7, 174262.8, 165019.7, 162506.0, 168746.8, 167484.5, 155400.1, 143361.6, 177832.7, 156325.6, 161725.6, 140871.4, 156811.9, 157107.7, 165454.7, 147159.9, 151345.3, 167606.4, 168041.8, 157460.8, 151148.7, 167052.7, 162957.9, 164408.4, 149161.0, 158717.7, 164800.2, 166276.0, 160767.2, 150539.7, 170429.0, 173388.3, 168475.0, 155901.5, 178725.1, 171977.1, 169856.9, 157341.9], "upper": [186697.1, 190489.7, 209579.9, 238884.5, 167132.2, 193754.2, 203153.7, 247309.2, 148529.2, 191478.3, 194193.6, 187910.4, 173735.4, 185846.1, 194429.4, 189362.5, 180119.4, 177605.7, 183846.5, 182584.3, 170499.8, 158461.4, 192932.4, 171425.4, 176825.4, 155971.1, 171911.7, 172207.5, 180554.4, 162259.7, 166445.1, 182706.1, 183141.5, 172560.5, 166248.5, 182152.5, 178057.6, 179508.1, 164260.8, 173817.4, 179899.9, 181375.7, 175867.0, 165639.5, 185528.7, 188488.0, 183574.8, 171001.2, 193824.9, 187076.8, 184956.6, 172441.7]}, "4_Dept95": {"model_used": "Holt-Winters (ETS)", "dates": ["2012-11-02", "2012-11-09", "2012-11-16", "2012-11-23", "2012-11-30", "2012-12-07", "2012-12-14", "2012-12-21", "2012-12-28", "2013-01-04", "2013-01-11", "2013-01-18", "2013-01-25", "2013-02-01", "2013-02-08", "2013-02-15", "2013-02-22", "2013-03-01", "2013-03-08", "2013-03-15", "2013-03-22", "2013-03-29", "2013-04-05", "2013-04-12", "2013-04-19", "2013-04-26", "2013-05-03", "2013-05-10", "2013-05-17", "2013-05-24", "2013-05-31", "2013-06-07", "2013-06-14", "2013-06-21", "2013-06-28", "2013-07-05", "2013-07-12", "2013-07-19", "2013-07-26", "2013-08-02", "2013-08-09", "2013-08-16", "2013-08-23", "2013-08-30", "2013-09-06", "2013-09-13", "2013-09-20", "2013-09-27", "2013-10-04", "2013-10-11", "2013-10-18", "2013-10-25"], "forecast": [149087.5, 146406.7, 146912.4, 140352.8, 128341.9, 141377.0, 145417.8, 156050.6, 117258.3, 137417.7, 142051.5, 150420.8, 140061.7, 151493.3, 153140.0, 149292.7, 146630.0, 147551.0, 151110.1, 155177.5, 141135.7, 143693.5, 157432.3, 155450.3, 162370.1, 148943.1, 164407.2, 158835.5, 162714.7, 161435.9, 162569.2, 172832.6, 177836.5, 168098.1, 167664.8, 167372.5, 163292.6, 163321.7, 152694.7, 162662.4, 169062.0, 170924.8, 159484.8, 160879.0, 164456.0, 159986.8, 153921.2, 149332.5, 157568.8, 152301.8, 154879.7, 144685.1], "lower": [142325.5, 139644.7, 140150.4, 133590.8, 121579.9, 134615.0, 138655.8, 149288.6, 110496.3, 130655.7, 135289.5, 143658.8, 133299.7, 144731.3, 146378.0, 142530.7, 139868.0, 140789.0, 144348.1, 148415.5, 134373.8, 136931.5, 150670.3, 148688.3, 155608.1, 142181.1, 157645.2, 152073.5, 155952.7, 154673.9, 155807.2, 166070.6, 171074.5, 161336.1, 160902.8, 160610.5, 156530.6, 156559.7, 145932.7, 155900.4, 162300.0, 164162.8, 152722.9, 154117.0, 157694.0, 153224.8, 147159.2, 142570.6, 150806.9, 145539.8, 148117.7, 137923.1], "upper": [155849.5, 153168.6, 153674.4, 147114.8, 135103.9, 148139.0, 152179.7, 162812.6, 124020.3, 144179.7, 148813.5, 157182.8, 146823.7, 158255.3, 159902.0, 156054.7, 153392.0, 154313.0, 157872.1, 161939.4, 147897.7, 150455.5, 164194.2, 162212.3, 169132.0, 155705.1, 171169.2, 165597.5, 169476.7, 168197.9, 169331.2, 179594.6, 184598.4, 174860.1, 174426.8, 174134.5, 170054.6, 170083.7, 159456.7, 169424.4, 175824.0, 177686.8, 166246.8, 167641.0, 171218.0, 166748.8, 160683.2, 156094.5, 164330.8, 159063.8, 161641.7, 151447.0]}}, "all_models_series": {"13_Dept38": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [96026.6, 84418.1, 94545.3, 82082.5, 84991.5, 89044.3, 93644.4, 87331.3, 91582.3, 88257.7, 88325.7, 92092.8], "forecasts": {"Naive (lag-1)": [94148.1, 94148.1, 94148.1, 94148.1, 94148.1, 94148.1, 94148.1, 94148.1, 94148.1, 94148.1, 94148.1, 94148.1], "Seasonal Naive (lag-52)": [77018.7, 90665.2, 78950.7, 82275.3, 79572.7, 104561.2, 91748.8, 79392.9, 78299.4, 85378.4, 89399.0, 88671.0], "Holt-Winters (ETS)": [84888.1, 82065.7, 80794.7, 97264.3, 80180.3, 93078.9, 85019.4, 98900.4, 91199.0, 89944.3, 85970.3, 90752.3], "LightGBM (global)": [77497.4, 85020.8, 79993.6, 84852.3, 80467.6, 85092.4, 88662.0, 86046.0, 81174.0, 87256.9, 87838.8, 84897.3]}}, "13_Dept92": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [171785.4, 182031.9, 168512.9, 167187.4, 182296.8, 176190.2, 179575.4, 169014.0, 181471.6, 184760.3, 184451.4, 183483.9], "forecasts": {"Naive (lag-1)": [171598.2, 171598.2, 171598.2, 171598.2, 171598.2, 171598.2, 171598.2, 171598.2, 171598.2, 171598.2, 171598.2, 171598.2], "Seasonal Naive (lag-52)": [159494.5, 165405.3, 158956.1, 160983.4, 159306.2, 172475.5, 159841.3, 171956.2, 194865.3, 174861.5, 176631.5, 165500.6], "Holt-Winters (ETS)": [171214.3, 178752.5, 171733.0, 182571.8, 172137.2, 182575.2, 165562.3, 172664.8, 187840.0, 184808.0, 178311.6, 180406.4], "LightGBM (global)": [173843.4, 175603.4, 176480.5, 179048.1, 181291.7, 183389.7, 182394.4, 188182.4, 206816.6, 193517.7, 193411.3, 182795.9]}}, "13_Dept95": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [157892.9, 159904.8, 148855.2, 152271.8, 153517.3, 140257.9, 144488.9, 134396.5, 140831.6, 135555.4, 137768.9, 127416.3], "forecasts": {"Naive (lag-1)": [155704.5, 155704.5, 155704.5, 155704.5, 155704.5, 155704.5, 155704.5, 155704.5, 155704.5, 155704.5, 155704.5, 155704.5], "Seasonal Naive (lag-52)": [148875.8, 147497.0, 146692.1, 151999.7, 140673.1, 144877.8, 136196.9, 136320.3, 146504.8, 134564.1, 140546.9, 126575.6], "Holt-Winters (ETS)": [152344.9, 155763.5, 147373.9, 152826.1, 140748.5, 144345.0, 135215.9, 135757.1, 141025.7, 134782.0, 135006.8, 126032.5], "LightGBM (global)": [161560.6, 159631.2, 156133.2, 167211.1, 157955.5, 158128.3, 154216.1, 155007.9, 158307.8, 153893.5, 154510.8, 145830.1]}}, "14_Dept38": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [76610.6, 89901.3, 81688.5, 95512.4, 72916.5, 84533.6, 79170.6, 81150.1, 78208.0, 88187.5, 84021.9, 81545.6], "forecasts": {"Naive (lag-1)": [87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0, 87164.0], "Seasonal Naive (lag-52)": [104054.2, 99430.1, 99831.4, 95701.1, 98712.9, 90251.4, 117335.7, 104259.7, 92619.0, 109905.4, 98842.8, 112181.5], "Holt-Winters (ETS)": [80752.9, 77767.5, 80901.0, 67863.2, 74210.5, 89643.9, 79894.2, 81184.3, 83320.4, 74167.1, 85049.7, 93865.7], "LightGBM (global)": [84872.1, 80883.6, 86522.3, 80214.0, 78834.9, 86981.0, 91847.5, 89963.4, 83570.9, 91455.7, 87316.9, 86748.7]}}, "14_Dept92": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [163284.8, 149472.8, 145009.7, 138589.1, 190579.7, 146630.3, 148417.2, 139707.8, 169519.2, 156174.2, 152511.5, 164464.0], "forecasts": {"Naive (lag-1)": [156774.7, 156774.7, 156774.7, 156774.7, 156774.7, 156774.7, 156774.7, 156774.7, 156774.7, 156774.7, 156774.7, 156774.7], "Seasonal Naive (lag-52)": [174877.1, 170691.0, 241120.0, 149419.9, 214449.0, 177437.5, 178288.7, 172057.5, 221834.3, 187911.1, 181127.7, 183447.1], "Holt-Winters (ETS)": [147299.0, 144266.7, 158741.1, 150924.3, 172708.6, 143910.6, 137172.3, 137906.0, 177757.7, 147564.2, 144550.3, 141916.8], "LightGBM (global)": [149390.1, 141398.0, 165574.2, 149269.8, 166220.4, 164394.8, 162739.3, 158083.0, 205372.2, 186955.5, 184984.9, 198229.5]}}, "14_Dept95": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [126159.0, 117213.7, 113004.1, 107728.9, 131721.0, 110841.0, 110174.1, 105376.1, 118491.7, 109851.1, 109526.8, 121352.6], "forecasts": {"Naive (lag-1)": [120581.8, 120581.8, 120581.8, 120581.8, 120581.8, 120581.8, 120581.8, 120581.8, 120581.8, 120581.8, 120581.8, 120581.8], "Seasonal Naive (lag-52)": [145969.2, 142079.4, 206434.0, 126671.9, 161247.0, 143460.5, 137095.6, 134772.5, 152106.7, 136819.1, 133454.1, 137222.8], "Holt-Winters (ETS)": [113090.4, 106736.4, 116164.5, 111332.2, 120336.3, 99379.9, 96775.6, 93918.5, 111539.8, 93350.7, 89118.0, 91461.9], "LightGBM (global)": [118379.7, 113153.6, 122064.2, 119830.0, 117166.6, 116668.5, 124706.9, 124538.4, 116099.0, 120683.3, 118400.0, 121205.5]}}, "20_Dept38": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [109597.1, 111501.2, 110673.0, 109884.2, 128804.6, 121817.8, 107513.4, 114014.2, 124166.0, 119799.7, 107033.6, 108597.1], "forecasts": {"Naive (lag-1)": [132252.9, 132252.9, 132252.9, 132252.9, 132252.9, 132252.9, 132252.9, 132252.9, 132252.9, 132252.9, 132252.9, 132252.9], "Seasonal Naive (lag-52)": [111502.4, 97615.1, 96664.9, 119415.9, 98443.5, 107274.6, 106211.3, 119614.1, 111903.2, 95121.0, 107221.2, 109283.3], "Holt-Winters (ETS)": [119574.6, 123826.8, 123229.5, 123255.3, 130963.2, 115605.5, 128390.1, 124752.6, 128024.7, 115364.5, 128093.4, 122729.3], "LightGBM (global)": [115499.6, 109081.5, 115341.5, 125664.3, 111554.4, 115478.0, 118270.1, 130456.8, 115733.4, 119986.0, 115133.0, 119978.5]}}, "20_Dept92": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [194032.5, 178603.5, 159088.1, 159049.6, 178042.7, 186759.1, 171529.4, 158539.1, 187027.0, 191136.1, 171537.9, 160786.0], "forecasts": {"Naive (lag-1)": [169471.5, 169471.5, 169471.5, 169471.5, 169471.5, 169471.5, 169471.5, 169471.5, 169471.5, 169471.5, 169471.5, 169471.5], "Seasonal Naive (lag-52)": [173616.0, 154544.4, 144088.4, 164320.1, 177797.5, 174558.2, 153460.2, 150256.3, 187148.4, 182995.1, 168520.0, 159043.5], "Holt-Winters (ETS)": [196097.1, 166474.8, 159998.1, 186008.1, 190071.9, 184551.8, 158050.8, 169371.7, 198435.3, 189951.7, 174129.8, 165267.0], "LightGBM (global)": [184339.2, 171348.4, 159854.6, 175226.3, 177112.4, 184602.6, 168982.2, 171092.4, 185594.4, 198389.4, 176773.6, 179358.4]}}, "20_Dept95": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [174529.9, 158188.9, 151040.1, 153289.1, 158419.9, 158569.3, 147852.5, 136009.7, 154324.3, 154962.8, 146373.8, 141644.4], "forecasts": {"Naive (lag-1)": [157301.7, 157301.7, 157301.7, 157301.7, 157301.7, 157301.7, 157301.7, 157301.7, 157301.7, 157301.7, 157301.7, 157301.7], "Seasonal Naive (lag-52)": [162233.3, 150600.6, 141664.5, 154018.6, 157060.8, 153382.5, 137080.9, 137190.7, 148157.0, 154193.0, 142458.5, 133484.3], "Holt-Winters (ETS)": [175938.4, 156445.5, 144922.8, 163447.3, 155182.3, 152485.5, 139787.0, 139470.3, 150096.1, 150157.9, 139882.3, 138936.8], "LightGBM (global)": [160552.6, 157422.3, 149035.7, 161785.6, 160061.2, 158503.3, 141057.5, 151773.4, 152795.8, 159618.3, 143202.0, 141958.6]}}, "2_Dept38": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [63261.2, 64288.8, 70536.5, 73745.2, 72382.3, 68752.2, 68481.4, 60410.3, 76287.1, 66963.0, 68932.2, 70757.7], "forecasts": {"Naive (lag-1)": [72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0, 72421.0], "Seasonal Naive (lag-52)": [79136.2, 71708.9, 83855.2, 79820.4, 70297.9, 82024.9, 82779.9, 76486.3, 86066.1, 96659.0, 76417.9, 77566.9], "Holt-Winters (ETS)": [64797.3, 62881.3, 66066.0, 67733.3, 74074.5, 67283.8, 77143.2, 82287.6, 77340.2, 80202.5, 71344.6, 72008.3], "LightGBM (global)": [73678.0, 75206.8, 77082.7, 71258.3, 73530.8, 77236.1, 78382.0, 75221.5, 77837.4, 80346.1, 78730.4, 79281.7]}}, "2_Dept92": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [170283.7, 173002.1, 157874.8, 169994.1, 182189.3, 179419.9, 169646.4, 159369.5, 192860.9, 192455.7, 175972.0, 169784.1], "forecasts": {"Naive (lag-1)": [170120.4, 170120.4, 170120.4, 170120.4, 170120.4, 170120.4, 170120.4, 170120.4, 170120.4, 170120.4, 170120.4, 170120.4], "Seasonal Naive (lag-52)": [158082.1, 153827.2, 147186.8, 156168.3, 164687.6, 163843.0, 150256.7, 148682.4, 176375.6, 164033.8, 163289.9, 158040.8], "Holt-Winters (ETS)": [173372.4, 166800.5, 161015.9, 176600.6, 179787.8, 176116.7, 162015.3, 171655.8, 184413.9, 183246.2, 172290.9, 172162.4], "LightGBM (global)": [172231.3, 170495.0, 163823.5, 169420.0, 180131.2, 178001.3, 169620.5, 169292.9, 187057.8, 182035.8, 179826.2, 174489.9]}}, "2_Dept95": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [157227.5, 151758.6, 137902.5, 154732.0, 155701.6, 151208.6, 145469.6, 144370.8, 152482.2, 145394.4, 146283.1, 138019.0], "forecasts": {"Naive (lag-1)": [159757.3, 159757.3, 159757.3, 159757.3, 159757.3, 159757.3, 159757.3, 159757.3, 159757.3, 159757.3, 159757.3, 159757.3], "Seasonal Naive (lag-52)": [150502.8, 146619.4, 147167.5, 145434.7, 144041.0, 142322.7, 135033.4, 135333.7, 148486.2, 141333.4, 137866.2, 128987.1], "Holt-Winters (ETS)": [160270.0, 155396.5, 150410.9, 151605.4, 150846.2, 152612.5, 144217.0, 141905.6, 148849.1, 146429.1, 142635.7, 138063.1], "LightGBM (global)": [157562.2, 152072.4, 152288.5, 155222.1, 154535.5, 151874.0, 151479.4, 150356.4, 157756.6, 151884.8, 149852.3, 144074.5]}}, "4_Dept38": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [80656.0, 72189.7, 68651.8, 77293.8, 70558.4, 80098.8, 73898.9, 71725.4, 86611.0, 72207.9, 67825.6, 78355.4], "forecasts": {"Naive (lag-1)": [78542.3, 78542.3, 78542.3, 78542.3, 78542.3, 78542.3, 78542.3, 78542.3, 78542.3, 78542.3, 78542.3, 78542.3], "Seasonal Naive (lag-52)": [79342.8, 81511.5, 78430.6, 86248.3, 84399.9, 82159.8, 78262.2, 79815.7, 84029.4, 90034.4, 86519.6, 77211.4], "Holt-Winters (ETS)": [78777.3, 82738.4, 80309.1, 85556.6, 75077.0, 86754.2, 78930.0, 79654.4, 94106.9, 76478.9, 81033.9, 83534.5], "LightGBM (global)": [72712.2, 78745.2, 77260.7, 78750.4, 74963.2, 77260.2, 76239.6, 77639.6, 80704.3, 80818.1, 80179.3, 80276.9]}}, "4_Dept92": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [172350.0, 173825.9, 168317.1, 158089.6, 177978.9, 180938.1, 176024.9, 163451.4, 186275.0, 179527.0, 177406.8, 164891.8], "forecasts": {"Naive (lag-1)": [166267.5, 166267.5, 166267.5, 166267.5, 166267.5, 166267.5, 166267.5, 166267.5, 166267.5, 166267.5, 166267.5, 166267.5], "Seasonal Naive (lag-52)": [159670.7, 171553.9, 152595.4, 152433.0, 168013.7, 168867.8, 163451.5, 146263.2, 178151.0, 166415.2, 171337.4, 159591.5], "Holt-Winters (ETS)": [177194.4, 174113.1, 159447.9, 169287.6, 176959.1, 179324.4, 171351.8, 166771.4, 180902.7, 173962.1, 179212.1, 165096.1], "LightGBM (global)": [173779.1, 175493.5, 172763.9, 174930.9, 179980.3, 181690.5, 180846.4, 163582.8, 192869.3, 182191.0, 186705.5, 181886.0]}}, "4_Dept95": {"dates": ["2012-08-10", "2012-08-17", "2012-08-24", "2012-08-31", "2012-09-07", "2012-09-14", "2012-09-21", "2012-09-28", "2012-10-05", "2012-10-12", "2012-10-19", "2012-10-26"], "actual": [166720.9, 175362.5, 164984.7, 160200.2, 169708.2, 158167.7, 155205.2, 150886.8, 157750.7, 152136.1, 154909.2, 145803.5], "forecasts": {"Naive (lag-1)": [167250.7, 167250.7, 167250.7, 167250.7, 167250.7, 167250.7, 167250.7, 167250.7, 167250.7, 167250.7, 167250.7, 167250.7], "Seasonal Naive (lag-52)": [167571.2, 168722.9, 155105.4, 163045.6, 161286.2, 160298.7, 152195.8, 146715.0, 161042.1, 150298.3, 157956.0, 142834.9], "Holt-Winters (ETS)": [174753.0, 172951.1, 161443.9, 165085.3, 166774.3, 165959.9, 159006.5, 154842.1, 162703.3, 158928.2, 160414.8, 150675.5], "LightGBM (global)": [169248.2, 168865.7, 169128.9, 169852.7, 170553.7, 170142.4, 169202.0, 160206.8, 173016.6, 166117.9, 173100.2, 159683.0]}}}}</script>
+<script>
+const DATA = JSON.parse(document.getElementById('payload').textContent);
+const modelColors = {
+  'Naive (lag-1)': '#C87A2A',
+  'Seasonal Naive (lag-52)': '#B4432E',
+  'Holt-Winters (ETS)': '#1A6E68',
+  'LightGBM (global)': '#4A6FA5',
+};
+
+// ---- KPI strip ----
+const kpiRow = document.getElementById('kpiRow');
+const wmaeImprove = ((DATA.kpis.naive_wmae - DATA.kpis.best_wmae) / DATA.kpis.naive_wmae * 100).toFixed(0);
+const kpis = [
+  { label: 'Accuracy-best = consistency-best?', value: DATA.kpis.agreement_count + ' of ' + DATA.kpis.n_series, delta: 'series where WMAE and std agree on the winner', cls: 'warn' },
+  { label: 'Corrected network safety stock', value: DATA.kpis.total_ss_corrected.toLocaleString()+' units', delta: `${DATA.kpis.reduction_corrected_vs_single_pct.toFixed(0)}% below the single-model plan`, cls: 'good' },
+  { label: 'Cumulative reduction vs. naive', value: DATA.kpis.reduction_corrected_vs_naive_pct.toFixed(0)+'%', delta: `${DATA.kpis.total_ss_naive.toLocaleString()} → ${DATA.kpis.total_ss_corrected.toLocaleString()} units, same 95% service level`, cls: 'good' },
+  { label: `Holt-Winters — WMAE`, value: DATA.kpis.best_wmae.toLocaleString(undefined,{maximumFractionDigits:0}), delta: `${wmaeImprove}% lower than naive, but not the whole story`, cls: '' },
+];
+kpiRow.innerHTML = kpis.map(k => `
+  <div class="kpi">
+    <div class="label">${k.label}</div>
+    <div class="value">${k.value}</div>
+    <div class="delta ${k.cls}">${k.delta}</div>
+  </div>`).join('');
+
+// ---- Model comparison chart ----
+const modelCtx = document.getElementById('modelChart');
+const modelRows = DATA.model_summary.slice().sort((a,b)=>a.wmae-b.wmae);
+const wmaeBestModel = modelRows[0].model;
+new Chart(modelCtx, {
+  type: 'bar',
+  data: {
+    labels: modelRows.map(r=>r.model),
+    datasets: [{
+      label: 'WMAE',
+      data: modelRows.map(r=>+r.wmae.toFixed(0)),
+      backgroundColor: modelRows.map(r=>r.model===wmaeBestModel ? '#1A6E68' : '#C9D3CE'),
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toLocaleString() + ' units WMAE' } } },
+    scales: { y: { ticks: { callback: v => v.toLocaleString() }, grid: { color: '#DCE3DF' } }, x: { grid: { display:false } } }
+  }
+});
+
+// ---- Series explorer ----
+const seriesSelect = document.getElementById('seriesSelect');
+const ids = Object.keys(DATA.series_data).sort();
+seriesSelect.innerHTML = ids.map(id => `<option value="${id}">${id.replace('_Dept',' · Dept ')} — ${DATA.series_data[id].model_used}</option>`).join('');
+function hexToRgba(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${alpha})`;
+}
+let seriesChart;
+function renderSeries(uid) {
+  const s = DATA.all_models_series[uid];
+  const selected = DATA.series_data[uid].model_used;
+  const ctx = document.getElementById('seriesChart');
+  if (seriesChart) seriesChart.destroy();
+
+  const modelDatasets = Object.keys(modelColors).map(model => {
+    const isSelected = model === selected;
+    return {
+      label: model + (isSelected ? '  ← selected (lowest std)' : ''),
+      data: s.forecasts[model],
+      borderColor: isSelected ? modelColors[model] : hexToRgba(modelColors[model], 0.75),
+      backgroundColor: 'transparent',
+      borderWidth: isSelected ? 3.5 : 1.8,
+      borderDash: isSelected ? [] : [5,3],
+      pointRadius: 0,
+      order: isSelected ? 2 : 3,  // Chart.js draws LOWER order on top; keep in sync with actual/halo below
+      tension: 0.2,
+    };
+  });
+
+  // Actual is drawn last (on top of every model line, including the selected
+  // one) with a white halo behind it, so it stays visible even where the
+  // selected model's line — chosen for tracking actual closely — nearly
+  // coincides with it. Point markers give it a second, shape-based cue too.
+  const actualHalo = {
+    label: 'Actual halo', data: s.actual,
+    borderColor: 'rgba(255,255,255,0.95)', backgroundColor: 'transparent',
+    borderWidth: 6.5, pointRadius: 0, tension: 0.2, order: 1,
+  };
+  const actualLine = {
+    label: 'Actual', data: s.actual,
+    borderColor: '#16241F', backgroundColor: 'transparent',
+    borderWidth: 2.75, tension: 0.2, order: 0,
+    pointRadius: 2.5, pointBackgroundColor: '#16241F',
+    pointBorderColor: '#fff', pointBorderWidth: 1,
+  };
+
+  seriesChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: s.dates,
+      datasets: [...modelDatasets, actualHalo, actualLine]
+    },
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          // Tooltip color swatches default to each dataset's backgroundColor,
+          // which is 'transparent' for every line here (they're strokes, not
+          // fills) — leaving every swatch blank/white. Use the line's own
+          // borderColor instead, and drop the invisible halo's duplicate row.
+          filter: (item) => item.dataset.label !== 'Actual halo',
+          callbacks: {
+            labelColor: (context) => {
+              // Actual's own line color (near-black, for contrast on the
+              // white page background) is invisible against Chart.js's dark
+              // default tooltip background — swap in white for the swatch
+              // only, same fix as the near-black-on-dark-panel legend bug.
+              const isActual = context.dataset.label === 'Actual';
+              const c = isActual ? '#FFFFFF' : context.dataset.borderColor;
+              return { borderColor: c, backgroundColor: c, borderWidth: 1 };
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 7, font: { size: 10.5 } }, grid: { display:false } },
+        y: { grid: { color: '#DCE3DF' } }
+      }
+    }
+  });
+
+  // Custom legend under the x-axis: bold/solid for Actual and the selected
+  // model (matching how they're drawn), muted/dashed for the other 3 — so
+  // the legend itself carries the same emphasis as the chart, rather than
+  // Chart.js's default uniform-weight legend.
+  const legendItems = [
+    { label: 'Actual', color: 'var(--ink)', dashed: false, emph: true },
+    ...Object.keys(modelColors).map(model => {
+      const isSelected = model === selected;
+      return {
+        label: model + (isSelected ? '  ← selected (lowest std)' : ''),
+        color: isSelected ? modelColors[model] : hexToRgba(modelColors[model], 0.85),
+        dashed: !isSelected,
+        emph: isSelected,
+      };
+    }),
+  ];
+  document.getElementById('seriesLegend').innerHTML = legendItems.map(it => `
+    <span class="item ${it.emph ? 'emph' : 'muted-item'}">
+      <span class="swatch-line${it.dashed ? ' dashed' : ''}" style="border-color:${it.color}"></span>${it.label}
+    </span>`).join('');
+}
+seriesSelect.addEventListener('change', e => renderSeries(e.target.value));
+renderSeries(ids[0]);
+
+// ---- Network safety stock: three-scenario chart ----
+new Chart(document.getElementById('scenarioChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Naive for every series', 'Single "best" model (ETS)\nfor every series', 'Model selected per series\nby lowest std (the fix)'],
+    datasets: [{
+      label: 'Total network safety stock (units)',
+      data: [DATA.kpis.total_ss_naive, DATA.kpis.total_ss_single_model, DATA.kpis.total_ss_corrected],
+      backgroundColor: ['#C9D3CE', '#C87A2A', '#1A6E68'],
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toLocaleString() + ' units' } } },
+    scales: { y: { ticks: { callback: v => v.toLocaleString() }, grid: { color: '#DCE3DF' } }, x: { grid: { display:false }, ticks: { font: { size: 11 } } } }
+  }
+});
+
+// ---- Accuracy vs. consistency scatter ----
+const cmp = DATA.model_comparison_full;
+const scatterDatasets = Object.keys(modelColors).map(model => ({
+  label: model,
+  data: cmp.filter(r => r.model === model).map(r => ({ x: r.wmae, y: r.std, uid: r.unique_id })),
+  backgroundColor: modelColors[model],
+  pointRadius: 5,
+  pointHoverRadius: 7,
+}));
+new Chart(document.getElementById('scatterChart'), {
+  type: 'scatter',
+  data: { datasets: scatterDatasets },
+  options: {
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: c => `${c.dataset.label} · ${c.raw.uid.replace('_Dept',' · Dept ')}: WMAE ${c.raw.x.toLocaleString()}, std ${c.raw.y.toLocaleString()}` } }
+    },
+    scales: {
+      x: { title: { display: true, text: 'WMAE (accuracy — lower is better)', font: { size: 11.5 } }, grid: { color: '#DCE3DF' } },
+      y: { title: { display: true, text: 'Forecast-error std (consistency — lower is better)', font: { size: 11.5 } }, grid: { color: '#DCE3DF' } },
+    }
+  }
+});
+document.getElementById('scatterLegend').innerHTML = Object.entries(modelColors)
+  .map(([m,c]) => `<span><span class="dot" style="background:${c}"></span>${m}</span>`).join('');
+
+// ---- Full comparison table (searchable, sortable) ----
+let cmpSort = { key: 'unique_id', dir: 1 };
+function renderCompareTable() {
+  const q = document.getElementById('compareSearch').value.trim().toLowerCase();
+  let rows = cmp.filter(r => r.unique_id.toLowerCase().includes(q));
+  rows = rows.slice().sort((a,b) => {
+    const av = a[cmpSort.key], bv = b[cmpSort.key];
+    if (typeof av === 'string') return av.localeCompare(bv) * cmpSort.dir;
+    return (av - bv) * cmpSort.dir;
+  });
+  document.querySelector('#compareTable tbody').innerHTML = rows.map(r => `
+    <tr>
+      <td class="text">${r.unique_id.replace('_Dept',' · Dept ')}</td>
+      <td class="text">${r.model}</td>
+      <td>${r.wmae.toLocaleString()}</td>
+      <td>${r.mae.toLocaleString()}</td>
+      <td>${r.std.toLocaleString()}</td>
+      <td>${r.bias > 0 ? '+' : ''}${r.bias.toLocaleString()}</td>
+    </tr>`).join('');
+}
+document.getElementById('compareSearch').addEventListener('input', renderCompareTable);
+document.querySelectorAll('#compareTable th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    cmpSort.dir = (cmpSort.key === key) ? -cmpSort.dir : 1;
+    cmpSort.key = key;
+    renderCompareTable();
+  });
+});
+renderCompareTable();
+
+// ---- 12-month future forecast ----
+const futureSelect = document.getElementById('futureSeriesSelect');
+futureSelect.innerHTML = ids.map(id => `<option value="${id}">${id.replace('_Dept',' · Dept ')} — ${DATA.future_forecast[id].model_used}</option>`).join('');
+let futureChart;
+function renderFuture(uid) {
+  const hist = DATA.series_data[uid];       // last 12 actual weeks (leads into the projection)
+  const fut = DATA.future_forecast[uid];    // next 52 weeks, genuine forecast
+  const labels = hist.dates.concat(fut.dates);
+  const pad = arr => new Array(hist.dates.length).fill(null).concat(arr);
+  const histPadded = hist.actual.concat(new Array(fut.dates.length).fill(null));
+  const ctx = document.getElementById('futureChart');
+  if (futureChart) futureChart.destroy();
+  futureChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Actual (last 12 weeks of data)', data: histPadded, borderColor: '#16241F', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.2 },
+        { label: 'Upper band', data: pad(fut.upper), borderWidth: 0, pointRadius: 0, fill: false },
+        { label: 'Lower band', data: pad(fut.lower), borderWidth: 0, pointRadius: 0, fill: '-1', backgroundColor: 'rgba(26,110,104,0.12)' },
+        { label: `Forecast — ${fut.model_used}`, data: pad(fut.forecast), borderColor: '#1A6E68', backgroundColor: 'transparent', borderWidth: 2, borderDash: [4,3], pointRadius: 0, tension: 0.2 },
+      ]
+    },
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11.5 }, filter: item => !item.text.includes('band') } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display:false } },
+        y: { grid: { color: '#DCE3DF' } }
+      }
+    }
+  });
+}
+futureSelect.addEventListener('change', e => renderFuture(e.target.value));
+renderFuture(ids[0]);
+
+// ---- Inventory table ----
+const tbody = document.querySelector('#invTable tbody');
+const invSorted = DATA.inventory_plan.slice().sort((a,b)=>b.error_cv-a.error_cv);
+tbody.innerHTML = invSorted.map(r => `
+  <tr>
+    <td class="text">${r.unique_id.replace('_Dept',' · Dept ')}</td>
+    <td class="text">${r.model_used}</td>
+    <td>${r.avg_weekly_demand.toLocaleString()}</td>
+    <td>${r.forecast_error_std.toLocaleString()}</td>
+    <td>${r.safety_stock_units.toLocaleString()}</td>
+    <td>${r.safety_stock_weeks_of_cover}</td>
+    <td>${r.reorder_point_units.toLocaleString()}</td>
+    <td style="color:${r.ss_change_vs_single_model_pct<0?'var(--red)':'var(--teal)'}">${r.ss_change_vs_single_model_pct>0?'−':'+'}${Math.abs(r.ss_change_vs_single_model_pct).toFixed(0)}%</td>
+    <td><span class="flag ${r.risk_flag}">${r.risk_flag}</span></td>
+  </tr>`).join('');
+</script>
+</body>
+</html>

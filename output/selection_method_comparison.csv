@@ -1,0 +1,16 @@
+unique_id,ss_single_model_ets,model_used,ss_per_series_optimized,savings_units
+14_Dept38,25112.0,Naive (lag-1),14397.0,10715.0
+2_Dept38,18293.0,Naive (lag-1),10522.0,7771.0
+13_Dept38,19770.0,Naive (lag-1),10044.0,9726.0
+14_Dept95,21198.0,Naive (lag-1),18661.0,2537.0
+20_Dept38,20380.0,Naive (lag-1),17011.0,3369.0
+14_Dept92,27138.0,Holt-Winters (ETS),27138.0,0.0
+20_Dept92,25645.0,LightGBM (global),20973.0,4672.0
+4_Dept38,9283.0,Holt-Winters (ETS),9283.0,0.0
+13_Dept92,18545.0,Naive (lag-1),15587.0,2958.0
+2_Dept92,15491.0,Seasonal Naive (lag-52),11782.0,3709.0
+20_Dept95,12008.0,Seasonal Naive (lag-52),10544.0,1464.0
+13_Dept95,10938.0,Holt-Winters (ETS),10938.0,0.0
+2_Dept95,11065.0,LightGBM (global),10048.0,1017.0
+4_Dept92,12640.0,Seasonal Naive (lag-52),10678.0,1962.0
+4_Dept95,9564.0,Holt-Winters (ETS),9564.0,0.0
